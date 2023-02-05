@@ -35,14 +35,15 @@ export const useFetch = <T>({ url }: { url: string }): ApiResponse<T> => {
    * Whenever the url changes, I need to perform
    * an async API request.
    *
-   * TODO: add abort controller to stop previous request made when url changes
-   * TODO: create utility function to return custom error messages based on status code received
+   * TODO: replace then/catch with async await
    * TODO: replace useState with useReducer
    */
   useEffect(() => {
-    fetch(url)
+    const controller = new AbortController();
+
+    fetch(url, { signal: controller.signal })
       .then((response: Response) => {
-        const { ok: isRequestSuccessful, status: statusCode, statusText } = response;
+        const { ok: isRequestSuccessful, status: statusCode } = response;
 
         if (!isRequestSuccessful) {
           const errorMessage = `Error occured while using following API endpoint ${url}`;
@@ -69,6 +70,7 @@ export const useFetch = <T>({ url }: { url: string }): ApiResponse<T> => {
 
     //* cleanup on component unmount
     return () => {
+      controller.abort();
       setApiState(initialApiState);
     };
   }, [url]);
