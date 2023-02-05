@@ -35,18 +35,18 @@ export const useFetch = <T>({ url }: { url: string }): ApiResponse<T> => {
    * Whenever the url changes, I need to perform
    * an async API request.
    *
-   * TODO: replace then/catch with async await
    * TODO: replace useState with useReducer
    */
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch(url, { signal: controller.signal })
-      .then((response: Response) => {
+    (async (apiEndpoint) => {
+      try {
+        const response = await fetch(apiEndpoint, { signal: controller.signal });
         const { ok: isRequestSuccessful, status: statusCode } = response;
 
         if (!isRequestSuccessful) {
-          const errorMessage = `Error occured while using following API endpoint ${url}`;
+          const errorMessage = `Error occured while using following API endpoint ${apiEndpoint}`;
           throw new Error(errorMessage, {
             cause: {
               statusCode,
@@ -54,19 +54,17 @@ export const useFetch = <T>({ url }: { url: string }): ApiResponse<T> => {
           });
         }
 
-        return response.json();
-      })
-      .then((data: T) => handleApiStateUpdated({ key: 'data', updatedValue: data }))
-      .catch((err: any) => {
+        const data: T = await response.json();
+        handleApiStateUpdated({ key: 'data', updatedValue: data });
+      } catch (err: any) {
         const statusCode: number = err?.cause?.statusCode ?? 400;
         const errorMessage = handleStatusCode({ statusCode });
 
-        handleApiStateUpdated({
-          key: 'errorMsg',
-          updatedValue: errorMessage,
-        });
-      })
-      .finally(() => handleApiStateUpdated({ key: 'loading', updatedValue: false }));
+        handleApiStateUpdated({ key: 'errorMsg', updatedValue: errorMessage });
+      } finally {
+        handleApiStateUpdated({ key: 'loading', updatedValue: false });
+      }
+    })(url);
 
     //* cleanup on component unmount
     return () => {
