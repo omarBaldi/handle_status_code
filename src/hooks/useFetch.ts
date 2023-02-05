@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { Reducer, useEffect, useReducer } from 'react';
+import { apiStateReducer } from './../reducers/api-state-reducer';
 import { handleStatusCode } from './../utils/handle-status-code';
+import { ApiStateActions } from '../actions/api-state-actions';
 
-interface ApiResponse<T> {
+export interface ApiResponse<T> {
   loading: boolean;
   errorMsg: string | null;
   data: T | T[] | null;
@@ -14,29 +16,16 @@ const initialApiState: ApiResponse<any> = {
 };
 
 /**
- *
+ * @desc
+ * @param {string} url
+ * @returns
  */
 export const useFetch = <T>({ url }: { url: string }): ApiResponse<T> => {
-  const [apiState, setApiState] = useState<ApiResponse<T>>({
-    ...initialApiState,
-  });
+  const [apiState, dispatch] = useReducer<Reducer<ApiResponse<T>, ApiStateActions<T>>>(
+    apiStateReducer,
+    initialApiState
+  );
 
-  const handleApiStateUpdated = ({
-    key,
-    updatedValue,
-  }: {
-    key: keyof typeof apiState;
-    updatedValue: typeof apiState[keyof typeof apiState];
-  }): void => {
-    setApiState((prevApiState) => ({ ...prevApiState, [key]: updatedValue }));
-  };
-
-  /**
-   * Whenever the url changes, I need to perform
-   * an async API request.
-   *
-   * TODO: replace useState with useReducer
-   */
   useEffect(() => {
     const controller = new AbortController();
 
@@ -55,21 +44,21 @@ export const useFetch = <T>({ url }: { url: string }): ApiResponse<T> => {
         }
 
         const data: T = await response.json();
-        handleApiStateUpdated({ key: 'data', updatedValue: data });
+        dispatch({ type: 'UPDATE_DATA', payload: { data } });
       } catch (err: any) {
         const statusCode: number = err?.cause?.statusCode ?? 400;
         const errorMessage = handleStatusCode({ statusCode });
 
-        handleApiStateUpdated({ key: 'errorMsg', updatedValue: errorMessage });
+        dispatch({ type: 'UPDATE_ERROR_MSG', payload: { errorMsg: errorMessage } });
       } finally {
-        handleApiStateUpdated({ key: 'loading', updatedValue: false });
+        dispatch({ type: 'UPDATE_LOADING', payload: { loading: false } });
       }
     })(url);
 
     //* cleanup on component unmount
     return () => {
       controller.abort();
-      setApiState(initialApiState);
+      dispatch({ type: 'RESET_VALUES', payload: { initialState: initialApiState } });
     };
   }, [url]);
 
